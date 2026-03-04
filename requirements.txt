@@ -1,0 +1,12 @@
+asgiref==3.11.1
+crispy-bootstrap5==2026.3
+Django==4.2.29
+django-axes==8.0.0
+django-crispy-forms==2.5
+django-csp==4.0
+gunicorn==23.0.0
+packaging==26.0
+python-dotenv==1.2.1
+sqlparse==0.5.5
+typing_extensions==4.15.0
+whitenoise==6.11.0
