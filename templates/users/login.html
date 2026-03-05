@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+
+{% block title %}RiskOps — Login{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-4">
+        <div class="card shadow-sm border-0 mt-5">
+            <div class="card-body p-4">
+                <div class="text-center mb-4">
+                    <i class="bi bi-shield-lock text-primary" style="font-size: 2.5rem;"></i>
+                    <h4 class="mt-2 fw-bold">RiskOps</h4>
+                    <p class="text-muted small">Enterprise Vulnerability Governance</p>
+                </div>
+
+                <form method="post">
+                    {% csrf_token %}
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Username</label>
+                        {{ form.username }}
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label fw-semibold">Password</label>
+                        {{ form.password }}
+                    </div>
+                    {% if form.errors %}
+                    <div class="alert alert-danger py-2 small">
+                        Invalid username or password.
+                    </div>
+                    {% endif %}
+                    <button type="submit" class="btn btn-primary w-100 mt-2">Sign In</button>
+                </form>
+            </div>
+        </div>
+        <p class="text-center text-muted small mt-3">
+            Accounts are locked after 5 failed attempts.
+        </p>
+    </div>
+</div>
+{% endblock %}
