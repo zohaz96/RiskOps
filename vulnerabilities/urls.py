@@ -3,4 +3,6 @@ from . import views
 
 app_name = "vulnerabilities"
 
-urlpatterns = []
+urlpatterns = [
+    path("", views.vulnerability_list, name="list"),
+]

@@ -3,4 +3,6 @@ from . import views
 
 app_name = "audit"
 
-urlpatterns = []
+urlpatterns = [
+    path("logs/", views.audit_log, name="logs"),
+]

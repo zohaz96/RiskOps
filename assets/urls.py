@@ -3,4 +3,6 @@ from . import views
 
 app_name = "assets"
 
-urlpatterns = []
+urlpatterns = [
+    path("", views.asset_list, name="list"),
+]
