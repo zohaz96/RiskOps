@@ -1,0 +1,112 @@
+{% extends "base.html" %}
+
+{% block title %}RiskOps — {{ asset.name }}{% endblock %}
+{% block page_title %}Asset Detail{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <a href="{% url 'assets:list' %}" class="text-muted text-decoration-none small">
+            <i class="bi bi-arrow-left"></i> Back to Assets
+        </a>
+        <h4 class="fw-bold mt-1 mb-0">{{ asset.name }}</h4>
+    </div>
+    <div class="d-flex gap-2">
+        {% if user.can_create %}
+        <a href="{% url 'assets:edit' asset.pk %}" class="btn btn-outline-primary">Edit</a>
+        {% endif %}
+        {% if user.can_delete %}
+        <a href="{% url 'assets:delete' asset.pk %}" class="btn btn-outline-danger">Delete</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-md-4">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 pt-3">
+                <h6 class="fw-bold mb-0">Asset Details</h6>
+            </div>
+            <div class="card-body">
+                <table class="table table-sm table-borderless mb-0">
+                    <tr>
+                        <td class="text-muted">Environment</td>
+                        <td>{{ asset.get_environment_display }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Criticality</td>
+                        <td>{{ asset.get_criticality_display }}</td>
+                    </tr>
+                    <tr>
+                        <td class="text-muted">Owner</td>
+                        <td>{{ asset.owner.username|default:"Unassigned" }}</td>
+                    </tr>
+                    {% if asset.ip_address %}
+                    <tr>
+                        <td class="text-muted">IP Address</td>
+                        <td>{{ asset.ip_address }}</td>
+                    </tr>
+                    {% endif %}
+                    {% if asset.hostname %}
+                    <tr>
+                        <td class="text-muted">Hostname</td>
+                        <td>{{ asset.hostname }}</td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td class="text-muted">Added</td>
+                        <td>{{ asset.created_at|date:"d M Y" }}</td>
+                    </tr>
+                </table>
+                {% if asset.description %}
+                <hr>
+                <p class="text-muted small mb-0">{{ asset.description }}</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+
+    <div class="col-md-8">
+        <div class="card border-0 shadow-sm">
+            <div class="card-header bg-white border-0 pt-3 d-flex justify-content-between align-items-center">
+                <h6 class="fw-bold mb-0">Linked Vulnerabilities</h6>
+                {% if user.can_create %}
+                <a href="{% url 'vulnerabilities:create' %}" class="btn btn-sm btn-primary">Report Vulnerability</a>
+                {% endif %}
+            </div>
+            <div class="card-body p-0">
+                <table class="table table-hover mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Title</th>
+                            <th>Severity</th>
+                            <th>Status</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for vuln in vulnerabilities %}
+                        <tr>
+                            <td>
+                                <a href="{% url 'vulnerabilities:detail' vuln.pk %}" class="text-decoration-none">
+                                    {{ vuln.title }}
+                                </a>
+                            </td>
+                            <td>
+                                <span class="badge badge-{{ vuln.severity }}">
+                                    {{ vuln.get_severity_display }}
+                                </span>
+                            </td>
+                            <td>{{ vuln.get_status_display }}</td>
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="3" class="text-center text-muted py-3">No vulnerabilities linked.</td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

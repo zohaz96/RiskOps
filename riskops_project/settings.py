@@ -109,3 +109,20 @@ AXES_COOLOFF_TIME = 1
 AXES_LOCKOUT_TEMPLATE = "users/lockout.html"
 AXES_RESET_ON_SUCCESS = True
 AXES_LOCKOUT_PARAMETERS = ["username", "ip_address"]
+
+# Production
+import dj_database_url
+
+STATIC_ROOT = BASE_DIR / "staticfiles"
+
+db_from_env = dj_database_url.config(default=f"sqlite:///{BASE_DIR}/db.sqlite3", conn_max_age=600)
+DATABASES["default"].update(db_from_env)
+
+if not DEBUG:
+    SECRET_KEY = os.environ.get("SECRET_KEY", SECRET_KEY)
+    ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
+    SECURE_SSL_REDIRECT = True
+    SESSION_COOKIE_SECURE = True
+    CSRF_COOKIE_SECURE = True
+    SECURE_HSTS_SECONDS = 31536000
+    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
