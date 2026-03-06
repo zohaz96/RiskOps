@@ -1,0 +1,63 @@
+{% extends "base.html" %}
+
+{% block title %}RiskOps — Audit Log{% endblock %}
+{% block page_title %}Audit Log{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h4 class="fw-bold mb-0">Tamper-Evident Audit Log</h4>
+    <span class="badge {% if chain_valid %}bg-success{% else %}bg-danger{% endif %} fs-6 px-3 py-2">
+        <i class="bi {% if chain_valid %}bi-shield-check{% else %}bi-shield-x{% endif %}"></i>
+        Chain Integrity: {% if chain_valid %}VERIFIED{% else %}COMPROMISED{% endif %}
+    </span>
+</div>
+
+{% if not chain_valid %}
+<div class="alert alert-danger">
+    <strong>Warning:</strong> Hash chain integrity check failed. The following log entries may have been tampered with: {{ broken_ids }}
+</div>
+{% endif %}
+
+<div class="card border-0 shadow-sm">
+    <div class="card-body p-0">
+        <table class="table table-hover mb-0 table-sm">
+            <thead class="table-light">
+                <tr>
+                    <th>Timestamp</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Entity</th>
+                    <th>Description</th>
+                    <th>IP Address</th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for log in logs %}
+                <tr {% if log.id in broken_ids %}class="table-danger"{% endif %}>
+                    <td class="text-muted small">{{ log.timestamp|date:"d M Y H:i" }}</td>
+                    <td>{{ log.username_snapshot }}</td>
+                    <td>
+                        <span class="badge
+                            {% if log.action == 'CREATE' %}bg-success
+                            {% elif log.action == 'DELETE' %}bg-danger
+                            {% elif log.action == 'UPDATE' %}bg-primary
+                            {% elif log.action == 'LOGIN' %}bg-info text-dark
+                            {% elif log.action == 'ACCESS_DENIED' %}bg-warning text-dark
+                            {% else %}bg-secondary{% endif %}">
+                            {{ log.action }}
+                        </span>
+                    </td>
+                    <td>{{ log.entity_type }} {% if log.entity_id %}#{{ log.entity_id }}{% endif %}</td>
+                    <td class="small">{{ log.description }}</td>
+                    <td class="text-muted small">{{ log.ip_address }}</td>
+                </tr>
+                {% empty %}
+                <tr>
+                    <td colspan="6" class="text-center text-muted py-4">No audit log entries yet.</td>
+                </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endblock %}
