@@ -118,9 +118,13 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 db_from_env = dj_database_url.config(default=f"sqlite:///{BASE_DIR}/db.sqlite3", conn_max_age=600)
 DATABASES["default"].update(db_from_env)
 
+# Always read ALLOWED_HOSTS from environment if set
+if os.environ.get("ALLOWED_HOSTS"):
+    ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS").split(",")
+
 if not DEBUG:
     SECRET_KEY = os.environ.get("SECRET_KEY", SECRET_KEY)
-    ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS", "127.0.0.1,localhost").split(",")
+    DEBUG = os.environ.get("DEBUG", "False") == "True"
     SECURE_SSL_REDIRECT = True
     SESSION_COOKIE_SECURE = True
     CSRF_COOKIE_SECURE = True
