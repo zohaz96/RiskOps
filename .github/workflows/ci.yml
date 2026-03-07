@@ -7,8 +7,8 @@ on:
     branches: [ main ]
 
 jobs:
-  check:
-    name: Django system check
+  test:
+    name: Run tests
     runs-on: ubuntu-latest
 
     steps:
@@ -24,8 +24,17 @@ jobs:
         run: |
           python -m pip install --upgrade pip
           pip install -r requirements.txt
+          pip install pytest pytest-django
+
+      - name: Create static directory
+        run: mkdir -p static
 
       - name: Run Django system check
         env:
           DJANGO_SETTINGS_MODULE: riskops_project.settings
-        run: python manage.py check
+        run: python manage.py check --deploy 2>/dev/null || python manage.py check
+
+      - name: Run pytest
+        env:
+          DJANGO_SETTINGS_MODULE: riskops_project.settings
+        run: pytest tests.py -v
