@@ -38,6 +38,16 @@ def analyst_user(db):
 
 
 @pytest.fixture
+def manager_user(db):
+    return User.objects.create_user(
+        username="testmanager",
+        email="manager@test.local",
+        password="ManagerPass123!",
+        role=Role.SECURITY_MANAGER,
+    )
+
+
+@pytest.fixture
 def auditor_user(db):
     return User.objects.create_user(
         username="testauditor",
@@ -187,3 +197,147 @@ class TestAuditLog:
             "asset": sample_asset.pk,
         })
         assert AuditLog.objects.filter(action="CREATE", entity_type="Vulnerability").exists()
+
+
+# Asset tests
+
+class TestAssets:
+
+    def test_list_visible_to_all_roles(self, client, auditor_user):
+        client.force_login(auditor_user)
+        response = client.get(reverse("assets:list"))
+        assert response.status_code == 200
+
+    def test_auditor_cannot_create(self, client, auditor_user):
+        client.force_login(auditor_user)
+        response = client.post(reverse("assets:create"), {
+            "name": "Blocked",
+            "environment": "production",
+            "criticality": "low",
+        })
+        assert response.status_code == 403
+
+    def test_analyst_can_create(self, client, analyst_user, admin_user):
+        client.force_login(analyst_user)
+        response = client.post(reverse("assets:create"), {
+            "name": "New Server",
+            "environment": "production",
+            "criticality": "medium",
+            "owner": admin_user.pk,
+        })
+        assert response.status_code == 302
+        assert Asset.objects.filter(name="New Server").exists()
+
+    def test_analyst_cannot_delete(self, client, analyst_user, sample_asset):
+        client.force_login(analyst_user)
+        client.post(reverse("assets:delete", kwargs={"pk": sample_asset.pk}))
+        assert Asset.objects.filter(pk=sample_asset.pk).exists()
+
+    def test_admin_can_delete(self, client, admin_user, sample_asset):
+        client.force_login(admin_user)
+        response = client.post(reverse("assets:delete", kwargs={"pk": sample_asset.pk}))
+        assert response.status_code == 302
+        assert not Asset.objects.filter(pk=sample_asset.pk).exists()
+
+
+# Vulnerability workflow tests
+
+class TestVulnerabilityWorkflow:
+
+    def test_analyst_can_edit_own_vuln(self, client, analyst_user, sample_asset):
+        vuln = Vulnerability.objects.create(
+            title="Mine",
+            description="test",
+            cvss_score=4.0,
+            severity=Severity.MEDIUM,
+            status=VulnStatus.OPEN,
+            asset=sample_asset,
+            reported_by=analyst_user,
+        )
+        client.force_login(analyst_user)
+        response = client.post(reverse("vulnerabilities:edit", kwargs={"pk": vuln.pk}), {
+            "title": "Updated",
+            "description": "test",
+            "cvss_score": 4.0,
+            "severity": Severity.MEDIUM,
+            "status": VulnStatus.OPEN,
+            "asset": sample_asset.pk,
+        })
+        assert response.status_code == 302
+        vuln.refresh_from_db()
+        assert vuln.title == "Updated"
+
+    def test_analyst_cannot_edit_others_vuln(self, client, analyst_user, sample_vuln):
+        client.force_login(analyst_user)
+        client.post(reverse("vulnerabilities:edit", kwargs={"pk": sample_vuln.pk}), {
+            "title": "Hijacked",
+            "description": "test",
+            "cvss_score": 5.0,
+            "severity": Severity.HIGH,
+            "status": VulnStatus.OPEN,
+            "asset": sample_vuln.asset.pk,
+        })
+        sample_vuln.refresh_from_db()
+        assert sample_vuln.title != "Hijacked"
+
+    def test_analyst_cannot_approve(self, client, analyst_user, sample_vuln):
+        client.force_login(analyst_user)
+        response = client.get(reverse("vulnerabilities:approve", kwargs={"pk": sample_vuln.pk}))
+        assert response.status_code == 403
+
+    def test_manager_can_approve(self, client, manager_user, sample_vuln):
+        client.force_login(manager_user)
+        response = client.post(reverse("vulnerabilities:approve", kwargs={"pk": sample_vuln.pk}), {
+            "status": VulnStatus.RESOLVED,
+        })
+        assert response.status_code == 302
+        sample_vuln.refresh_from_db()
+        assert sample_vuln.status == VulnStatus.RESOLVED
+
+    def test_analyst_cannot_delete(self, client, analyst_user, sample_vuln):
+        client.force_login(analyst_user)
+        client.post(reverse("vulnerabilities:delete", kwargs={"pk": sample_vuln.pk}))
+        assert Vulnerability.objects.filter(pk=sample_vuln.pk).exists()
+
+    def test_admin_can_delete(self, client, admin_user, sample_vuln):
+        client.force_login(admin_user)
+        response = client.post(reverse("vulnerabilities:delete", kwargs={"pk": sample_vuln.pk}))
+        assert response.status_code == 302
+        assert not Vulnerability.objects.filter(pk=sample_vuln.pk).exists()
+
+
+# User management tests
+
+class TestUserManagement:
+
+    def test_admin_can_delete_user(self, client, admin_user, analyst_user):
+        client.force_login(admin_user)
+        response = client.post(reverse("users:user_delete", kwargs={"pk": analyst_user.pk}))
+        assert response.status_code == 302
+        assert not User.objects.filter(pk=analyst_user.pk).exists()
+
+    def test_admin_cannot_delete_self(self, client, admin_user):
+        client.force_login(admin_user)
+        client.post(reverse("users:user_delete", kwargs={"pk": admin_user.pk}))
+        assert User.objects.filter(pk=admin_user.pk).exists()
+
+    def test_password_change(self, client, analyst_user):
+        client.force_login(analyst_user)
+        response = client.post(reverse("users:password_change"), {
+            "old_password": "AnalystPass123!",
+            "new_password1": "NewAnalystPass456!",
+            "new_password2": "NewAnalystPass456!",
+        })
+        assert response.status_code == 302
+        analyst_user.refresh_from_db()
+        assert analyst_user.check_password("NewAnalystPass456!")
+
+    def test_password_change_wrong_old(self, client, analyst_user):
+        client.force_login(analyst_user)
+        response = client.post(reverse("users:password_change"), {
+            "old_password": "wrongpassword",
+            "new_password1": "NewAnalystPass456!",
+            "new_password2": "NewAnalystPass456!",
+        })
+        assert response.status_code == 200
+        assert analyst_user.check_password("AnalystPass123!")

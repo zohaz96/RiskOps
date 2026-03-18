@@ -48,6 +48,9 @@
                     </td>
                     <td>
                         <a href="{% url 'users:user_edit' u.pk %}" class="btn btn-sm btn-outline-primary">Edit</a>
+                        {% if u != user %}
+                        <a href="{% url 'users:user_delete' u.pk %}" class="btn btn-sm btn-outline-danger ms-1">Delete</a>
+                        {% endif %}
                     </td>
                 </tr>
                 {% empty %}

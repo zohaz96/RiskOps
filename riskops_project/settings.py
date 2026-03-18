@@ -96,6 +96,8 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
+EMAIL_BACKEND = "django.core.mail.backends.console.EmailBackend"
+
 LOGIN_URL = "/users/login/"
 LOGIN_REDIRECT_URL = "/dashboard/"
 LOGOUT_REDIRECT_URL = "/users/login/"
