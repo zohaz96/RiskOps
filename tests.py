@@ -115,6 +115,11 @@ class TestAuthentication:
         })
         assert response.status_code != 302
 
+    def test_dashboard_loads_after_login(self, client, analyst_user):
+        client.force_login(analyst_user)
+        response = client.get(reverse("core:dashboard"))
+        assert response.status_code == 200
+
 
 # Authorisation
 
@@ -251,6 +256,11 @@ class TestAuditLog:
         assert is_valid
         assert broken == []
 
+    def test_admin_can_view_audit_log(self, client, admin_user):
+        client.force_login(admin_user)
+        response = client.get(reverse("audit:logs"))
+        assert response.status_code == 200
+
     def test_hash_chain_detects_tampering(self, admin_user):
         from audit.models import AuditLog
         from audit.utils import log_action
@@ -305,6 +315,23 @@ class TestAssets:
         response = client.post(reverse("assets:delete", kwargs={"pk": sample_asset.pk}))
         assert response.status_code == 302
         assert not Asset.objects.filter(pk=sample_asset.pk).exists()
+
+    def test_asset_detail_loads(self, client, analyst_user, sample_asset):
+        client.force_login(analyst_user)
+        response = client.get(reverse("assets:detail", kwargs={"pk": sample_asset.pk}))
+        assert response.status_code == 200
+
+    def test_analyst_can_edit_asset(self, client, analyst_user, sample_asset):
+        client.force_login(analyst_user)
+        response = client.post(reverse("assets:edit", kwargs={"pk": sample_asset.pk}), {
+            "name": "Renamed Server",
+            "environment": Environment.PRODUCTION,
+            "criticality": Criticality.HIGH,
+            "owner": sample_asset.owner.pk,
+        })
+        assert response.status_code == 302
+        sample_asset.refresh_from_db()
+        assert sample_asset.name == "Renamed Server"
 
 
 # Vulnerability workflow
@@ -398,6 +425,19 @@ class TestUserManagement:
         assert response.status_code == 302
         analyst_user.refresh_from_db()
         assert analyst_user.check_password("NewAnalystPass456!")
+
+    def test_admin_can_create_user(self, client, admin_user):
+        client.force_login(admin_user)
+        response = client.post(reverse("users:user_create"), {
+            "username": "newuser",
+            "email": "new@test.local",
+            "first_name": "New",
+            "last_name": "User",
+            "password": "NewUserPass123!",
+            "role": Role.SECURITY_ANALYST,
+        })
+        assert response.status_code == 302
+        assert User.objects.filter(username="newuser").exists()
 
     def test_password_change_wrong_old(self, client, analyst_user):
         client.force_login(analyst_user)
