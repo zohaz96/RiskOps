@@ -10,14 +10,12 @@ from audit.utils import log_action
 
 @login_required
 def vulnerability_list(request):
-    """All users can view the vulnerability list."""
     vulnerabilities = Vulnerability.objects.select_related("asset", "reported_by").all()
     return render(request, "vulnerabilities/vulnerability_list.html", {"vulnerabilities": vulnerabilities})
 
 
 @login_required
 def vulnerability_detail(request, pk):
-    """All users can view vulnerability details."""
     vuln = get_object_or_404(Vulnerability, pk=pk)
     return render(request, "vulnerabilities/vulnerability_detail.html", {"vuln": vuln})
 
@@ -25,7 +23,6 @@ def vulnerability_detail(request, pk):
 @login_required
 @analyst_or_above
 def vulnerability_create(request):
-    """Analysts, managers and admins can report new vulnerabilities."""
     if request.method == "POST":
         form = VulnerabilityForm(request.POST)
         if form.is_valid():
@@ -43,14 +40,9 @@ def vulnerability_create(request):
 @login_required
 @analyst_or_above
 def vulnerability_edit(request, pk):
-    """
-    Analysts can only edit their own vulnerabilities.
-    Managers and admins can edit any vulnerability.
-    This enforces object-level access control (OWASP A01).
-    """
     vuln = get_object_or_404(Vulnerability, pk=pk)
 
-    # Object-level check — analysts can only edit their own reports
+    # analysts can only edit their own reports
     if request.user.is_security_analyst and vuln.reported_by != request.user:
         messages.error(request, "You can only edit vulnerabilities you reported.")
         return redirect("vulnerabilities:detail", pk=vuln.pk)
@@ -70,7 +62,7 @@ def vulnerability_edit(request, pk):
 @login_required
 @manager_or_above
 def vulnerability_approve(request, pk):
-    """Only managers and admins can approve or close vulnerabilities — separation of duties."""
+    # managers and above only — analysts cannot approve their own reports
     vuln = get_object_or_404(Vulnerability, pk=pk)
     if request.method == "POST":
         new_status = request.POST.get("status")
@@ -87,7 +79,6 @@ def vulnerability_approve(request, pk):
 
 @login_required
 def vulnerability_delete(request, pk):
-    """Only admins can delete vulnerabilities."""
     if not request.user.can_delete:
         messages.error(request, "You do not have permission to delete vulnerabilities.")
         return redirect("vulnerabilities:detail", pk=pk)

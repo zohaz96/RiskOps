@@ -9,7 +9,6 @@ from audit.utils import log_action
 
 
 def login_view(request):
-    """Handle user login — django-axes automatically locks accounts after 5 failed attempts."""
     if request.user.is_authenticated:
         return redirect("core:dashboard")
 
@@ -35,7 +34,6 @@ def login_view(request):
 
 
 def logout_view(request):
-    """Log the user out and redirect to login page."""
     if request.user.is_authenticated:
         log_action(request, "LOGOUT", "User", request.user.id, f"{request.user.username} logged out")
     logout(request)
@@ -45,7 +43,6 @@ def logout_view(request):
 @login_required
 @admin_required
 def user_list(request):
-    """Admin only — view and manage all user accounts."""
     users = User.objects.all().order_by("role", "username")
     return render(request, "users/user_list.html", {"users": users})
 
@@ -53,7 +50,6 @@ def user_list(request):
 @login_required
 @admin_required
 def user_create(request):
-    """Admin only — create a new user account."""
     if request.method == "POST":
         form = UserCreationForm(request.POST)
         if form.is_valid():
@@ -69,7 +65,6 @@ def user_create(request):
 @login_required
 @admin_required
 def user_edit(request, pk):
-    """Admin only — edit an existing user's details or role."""
     user = get_object_or_404(User, pk=pk)
     if request.method == "POST":
         form = UserEditForm(request.POST, instance=user)
@@ -115,5 +110,4 @@ def password_change(request):
 
 
 def lockout_view(request, *args, **kwargs):
-    """Shown when django-axes locks an account after too many failed login attempts."""
     return render(request, "users/lockout.html", status=403)
