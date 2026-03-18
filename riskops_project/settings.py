@@ -1,14 +1,15 @@
 from pathlib import Path
 from dotenv import load_dotenv
 import os
+import secrets
 
 load_dotenv()
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-SECRET_KEY = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
+SECRET_KEY = os.environ.get("SECRET_KEY") or secrets.token_hex(50)
 
-DEBUG = True
+DEBUG = os.environ.get("DEBUG", "False") == "True"
 
 ALLOWED_HOSTS = ["localhost", "127.0.0.1"]
 
@@ -120,15 +121,12 @@ STATIC_ROOT = BASE_DIR / "staticfiles"
 db_from_env = dj_database_url.config(default=f"sqlite:///{BASE_DIR}/db.sqlite3", conn_max_age=600)
 DATABASES["default"].update(db_from_env)
 
-# Always read ALLOWED_HOSTS from environment if set
 if os.environ.get("ALLOWED_HOSTS"):
     ALLOWED_HOSTS = os.environ.get("ALLOWED_HOSTS").split(",")
 
-if not DEBUG:
-    SECRET_KEY = os.environ.get("SECRET_KEY", SECRET_KEY)
-    DEBUG = os.environ.get("DEBUG", "False") == "True"
-    SECURE_SSL_REDIRECT = True
-    SESSION_COOKIE_SECURE = True
-    CSRF_COOKIE_SECURE = True
-    SECURE_HSTS_SECONDS = 31536000
-    SECURE_HSTS_INCLUDE_SUBDOMAINS = True
+SECURE_SSL_REDIRECT = not DEBUG
+SESSION_COOKIE_SECURE = not DEBUG
+CSRF_COOKIE_SECURE = not DEBUG
+SECURE_HSTS_SECONDS = 31536000
+SECURE_HSTS_PRELOAD = True
+SECURE_HSTS_INCLUDE_SUBDOMAINS = True
