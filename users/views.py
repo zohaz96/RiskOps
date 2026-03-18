@@ -1,8 +1,8 @@
-from django.contrib.auth import login, logout
+from django.contrib.auth import login, logout, update_session_auth_hash
 from django.contrib.auth.decorators import login_required
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib import messages
-from .forms import LoginForm, UserCreationForm, UserEditForm
+from .forms import LoginForm, UserCreationForm, UserEditForm, PasswordChangeForm
 from .models import User
 from .decorators import admin_required
 from audit.utils import log_action
@@ -81,6 +81,37 @@ def user_edit(request, pk):
     else:
         form = UserEditForm(instance=user)
     return render(request, "users/user_form.html", {"form": form, "title": "Edit User"})
+
+
+@login_required
+@admin_required
+def user_delete(request, pk):
+    user = get_object_or_404(User, pk=pk)
+    if user == request.user:
+        messages.error(request, "You cannot delete your own account.")
+        return redirect("users:user_list")
+    if request.method == "POST":
+        username = user.username
+        user.delete()
+        log_action(request, "DELETE", "User", pk, f"Deleted user {username}")
+        messages.success(request, f"User {username} deleted.")
+        return redirect("users:user_list")
+    return render(request, "users/user_confirm_delete.html", {"user_to_delete": user})
+
+
+@login_required
+def password_change(request):
+    if request.method == "POST":
+        form = PasswordChangeForm(request.user, request.POST)
+        if form.is_valid():
+            user = form.save()
+            update_session_auth_hash(request, user)
+            log_action(request, "UPDATE", "User", user.id, f"{user.username} changed their password")
+            messages.success(request, "Password changed successfully.")
+            return redirect("core:dashboard")
+    else:
+        form = PasswordChangeForm(request.user)
+    return render(request, "users/password_change.html", {"form": form})
 
 
 def lockout_view(request, *args, **kwargs):
