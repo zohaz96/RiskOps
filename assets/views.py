@@ -9,14 +9,12 @@ from audit.utils import log_action
 
 @login_required
 def asset_list(request):
-    """All users can view the asset register."""
     assets = Asset.objects.select_related("owner").all()
     return render(request, "assets/asset_list.html", {"assets": assets})
 
 
 @login_required
 def asset_detail(request, pk):
-    """All users can view asset details including linked vulnerabilities."""
     asset = get_object_or_404(Asset, pk=pk)
     vulnerabilities = asset.vulnerabilities.select_related("reported_by").all()
     return render(request, "assets/asset_detail.html", {"asset": asset, "vulnerabilities": vulnerabilities})
@@ -25,7 +23,6 @@ def asset_detail(request, pk):
 @login_required
 @analyst_or_above
 def asset_create(request):
-    """Analysts, managers and admins can add new assets."""
     if request.method == "POST":
         form = AssetForm(request.POST)
         if form.is_valid():
@@ -41,7 +38,6 @@ def asset_create(request):
 @login_required
 @analyst_or_above
 def asset_edit(request, pk):
-    """Analysts, managers and admins can edit assets."""
     asset = get_object_or_404(Asset, pk=pk)
     if request.method == "POST":
         form = AssetForm(request.POST, instance=asset)
@@ -57,7 +53,6 @@ def asset_edit(request, pk):
 
 @login_required
 def asset_delete(request, pk):
-    """Only admins can delete assets."""
     if not request.user.can_delete:
         messages.error(request, "You do not have permission to delete assets.")
         return redirect("assets:detail", pk=pk)

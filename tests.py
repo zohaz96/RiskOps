@@ -7,7 +7,7 @@ from vulnerabilities.models import Vulnerability, Severity, VulnStatus
 from vulnerabilities.forms import VulnerabilityForm
 
 
-# ── Fixtures ────────────────────────────────────────────────────────────
+# Fixtures
 
 @pytest.fixture
 def client():
@@ -80,18 +80,16 @@ def sample_vuln(db, admin_user, sample_asset):
     )
 
 
-# ── Authentication Tests ────────────────────────────────────────────
+# Authentication
 
 class TestAuthentication:
 
     def test_unauthenticated_redirects_to_login(self, client):
-        """Unauthenticated users must be redirected — OWASP A07."""
         response = client.get(reverse("core:dashboard"))
         assert response.status_code == 302
         assert "/users/login/" in response["Location"]
 
     def test_login_succeeds_with_valid_credentials(self, client, admin_user):
-        """Valid credentials should log the user in."""
         response = client.post(reverse("users:login"), {
             "username": "testadmin",
             "password": "AdminPass123!",
@@ -99,49 +97,60 @@ class TestAuthentication:
         assert response.status_code == 302
 
     def test_login_fails_with_invalid_credentials(self, client, admin_user):
-        """Invalid credentials must not authenticate — OWASP A07."""
         response = client.post(reverse("users:login"), {
             "username": "testadmin",
             "password": "wrongpassword",
         })
-        assert response.status_code == 200  # stays on login page
+        assert response.status_code == 200
+
+    def test_lockout_after_repeated_failures(self, client, admin_user):
+        for _ in range(5):
+            client.post(reverse("users:login"), {
+                "username": "testadmin",
+                "password": "wrongpassword",
+            })
+        response = client.post(reverse("users:login"), {
+            "username": "testadmin",
+            "password": "AdminPass123!",
+        })
+        assert response.status_code != 302
+
+    def test_dashboard_loads_after_login(self, client, analyst_user):
+        client.force_login(analyst_user)
+        response = client.get(reverse("core:dashboard"))
+        assert response.status_code == 200
 
 
-# ── Authorisation Tests ───────────────────────────────────────────────────────
+# Authorisation
 
 class TestAuthorisation:
 
     def test_auditor_cannot_access_user_management(self, client, auditor_user):
-        """Auditors must not access user management — OWASP A01."""
         client.force_login(auditor_user)
         response = client.get(reverse("users:user_list"))
         assert response.status_code == 403
 
     def test_auditor_cannot_access_audit_log(self, client, auditor_user):
-        """Only admins can view audit log — OWASP A01."""
         client.force_login(auditor_user)
         response = client.get(reverse("audit:logs"))
         assert response.status_code == 403
 
     def test_analyst_cannot_access_user_management(self, client, analyst_user):
-        """Analysts must not access user management — OWASP A01."""
         client.force_login(analyst_user)
         response = client.get(reverse("users:user_list"))
         assert response.status_code == 403
 
     def test_admin_can_access_user_management(self, client, admin_user):
-        """Admins can access user management."""
         client.force_login(admin_user)
         response = client.get(reverse("users:user_list"))
         assert response.status_code == 200
 
 
-# ── Input Validation Tests ─────────────────────────────────────────────────
+# Input validation
 
 class TestInputValidation:
 
-    def test_cvss_score_above_10_rejected(self, db, admin_user, sample_asset):
-        """CVSS score above 10 must be rejected — OWASP A03."""
+    def test_cvss_score_above_10_rejected(self, sample_asset):
         form = VulnerabilityForm(data={
             "title": "Test",
             "description": "Test",
@@ -152,8 +161,7 @@ class TestInputValidation:
         })
         assert not form.is_valid()
 
-    def test_invalid_cve_format_rejected(self, db, admin_user, sample_asset):
-        """Malformed CVE references must be rejected — OWASP A03."""
+    def test_invalid_cve_format_rejected(self, sample_asset):
         form = VulnerabilityForm(data={
             "title": "Test",
             "description": "Test",
@@ -166,8 +174,7 @@ class TestInputValidation:
         assert not form.is_valid()
         assert "cve_reference" in form.errors
 
-    def test_valid_cve_format_accepted(self, db, admin_user, sample_asset):
-        """Correctly formatted CVE references must be accepted."""
+    def test_valid_cve_format_accepted(self, sample_asset):
         form = VulnerabilityForm(data={
             "title": "Test",
             "description": "Test",
@@ -180,12 +187,11 @@ class TestInputValidation:
         assert form.is_valid()
 
 
-# ── Audit Log Tests ──────────────────────────────────────────
+# Audit log
 
 class TestAuditLog:
 
     def test_vulnerability_creation_logged(self, client, analyst_user, sample_asset):
-        """Creating a vulnerability must generate an audit log entry — OWASP A09."""
         from audit.models import AuditLog
         client.force_login(analyst_user)
         client.post(reverse("vulnerabilities:create"), {
@@ -198,8 +204,79 @@ class TestAuditLog:
         })
         assert AuditLog.objects.filter(action="CREATE", entity_type="Vulnerability").exists()
 
+    def test_vulnerability_update_logged(self, client, analyst_user, sample_asset):
+        from audit.models import AuditLog
+        vuln = Vulnerability.objects.create(
+            title="To Edit",
+            description="test",
+            cvss_score=4.0,
+            severity=Severity.MEDIUM,
+            status=VulnStatus.OPEN,
+            asset=sample_asset,
+            reported_by=analyst_user,
+        )
+        client.force_login(analyst_user)
+        client.post(reverse("vulnerabilities:edit", kwargs={"pk": vuln.pk}), {
+            "title": "Edited",
+            "description": "test",
+            "cvss_score": 4.0,
+            "severity": Severity.MEDIUM,
+            "status": VulnStatus.OPEN,
+            "asset": sample_asset.pk,
+        })
+        assert AuditLog.objects.filter(action="UPDATE", entity_type="Vulnerability").exists()
 
-# Asset tests
+    def test_vulnerability_approve_logged(self, client, manager_user, sample_vuln):
+        from audit.models import AuditLog
+        client.force_login(manager_user)
+        client.post(reverse("vulnerabilities:approve", kwargs={"pk": sample_vuln.pk}), {
+            "status": VulnStatus.RESOLVED,
+        })
+        assert AuditLog.objects.filter(action="APPROVE", entity_type="Vulnerability").exists()
+
+    def test_vulnerability_delete_logged(self, client, admin_user, sample_vuln):
+        from audit.models import AuditLog
+        pk = sample_vuln.pk
+        client.force_login(admin_user)
+        client.post(reverse("vulnerabilities:delete", kwargs={"pk": pk}))
+        assert AuditLog.objects.filter(action="DELETE", entity_type="Vulnerability").exists()
+
+    def test_hash_chain_intact_after_actions(self, client, analyst_user, sample_asset):
+        from audit.models import AuditLog
+        client.force_login(analyst_user)
+        client.post(reverse("vulnerabilities:create"), {
+            "title": "Chain Test",
+            "description": "Test",
+            "cvss_score": 5.0,
+            "severity": Severity.MEDIUM,
+            "status": VulnStatus.OPEN,
+            "asset": sample_asset.pk,
+        })
+        is_valid, broken = AuditLog.verify_chain_integrity()
+        assert is_valid
+        assert broken == []
+
+    def test_admin_can_view_audit_log(self, client, admin_user):
+        client.force_login(admin_user)
+        response = client.get(reverse("audit:logs"))
+        assert response.status_code == 200
+
+    def test_hash_chain_detects_tampering(self, admin_user):
+        from audit.models import AuditLog
+        from audit.utils import log_action
+        from django.test import RequestFactory
+        factory = RequestFactory()
+        request = factory.get("/")
+        request.user = admin_user
+        log_action(request, "CREATE", "Test", 1, "original description")
+        entry = AuditLog.objects.first()
+        AuditLog.objects.filter(pk=entry.pk).update(description="tampered")
+        is_valid, broken = AuditLog.verify_chain_integrity()
+        assert not is_valid
+        assert entry.pk in broken
+
+
+# Assets
 
 class TestAssets:
 
@@ -239,8 +316,25 @@ class TestAssets:
         assert response.status_code == 302
         assert not Asset.objects.filter(pk=sample_asset.pk).exists()
 
+    def test_asset_detail_loads(self, client, analyst_user, sample_asset):
+        client.force_login(analyst_user)
+        response = client.get(reverse("assets:detail", kwargs={"pk": sample_asset.pk}))
+        assert response.status_code == 200
 
-# Vulnerability workflow tests
+    def test_analyst_can_edit_asset(self, client, analyst_user, sample_asset):
+        client.force_login(analyst_user)
+        response = client.post(reverse("assets:edit", kwargs={"pk": sample_asset.pk}), {
+            "name": "Renamed Server",
+            "environment": Environment.PRODUCTION,
+            "criticality": Criticality.HIGH,
+            "owner": sample_asset.owner.pk,
+        })
+        assert response.status_code == 302
+        sample_asset.refresh_from_db()
+        assert sample_asset.name == "Renamed Server"
+
+
+# Vulnerability workflow
 
 class TestVulnerabilityWorkflow:
 
@@ -270,7 +364,7 @@ class TestVulnerabilityWorkflow:
     def test_analyst_cannot_edit_others_vuln(self, client, analyst_user, sample_vuln):
         client.force_login(analyst_user)
         client.post(reverse("vulnerabilities:edit", kwargs={"pk": sample_vuln.pk}), {
-            "title": "Hijacked",
+            "title": "Not mine",
             "description": "test",
             "cvss_score": 5.0,
             "severity": Severity.HIGH,
@@ -278,7 +372,7 @@ class TestVulnerabilityWorkflow:
             "asset": sample_vuln.asset.pk,
         })
         sample_vuln.refresh_from_db()
-        assert sample_vuln.title != "Hijacked"
+        assert sample_vuln.title != "Not mine"
 
     def test_analyst_cannot_approve(self, client, analyst_user, sample_vuln):
         client.force_login(analyst_user)
@@ -306,7 +400,7 @@ class TestVulnerabilityWorkflow:
         assert not Vulnerability.objects.filter(pk=sample_vuln.pk).exists()
 
 
-# User management tests
+# User management
 
 class TestUserManagement:
 
@@ -331,6 +425,19 @@ class TestUserManagement:
         assert response.status_code == 302
         analyst_user.refresh_from_db()
         assert analyst_user.check_password("NewAnalystPass456!")
+
+    def test_admin_can_create_user(self, client, admin_user):
+        client.force_login(admin_user)
+        response = client.post(reverse("users:user_create"), {
+            "username": "newuser",
+            "email": "new@test.local",
+            "first_name": "New",
+            "last_name": "User",
+            "password": "NewUserPass123!",
+            "role": Role.SECURITY_ANALYST,
+        })
+        assert response.status_code == 302
+        assert User.objects.filter(username="newuser").exists()
 
     def test_password_change_wrong_old(self, client, analyst_user):
         client.force_login(analyst_user)
